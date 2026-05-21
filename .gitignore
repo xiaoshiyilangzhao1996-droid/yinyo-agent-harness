@@ -2,3 +2,4 @@ article_images/
 公众号推文.*
 __pycache__/
 *.pyc
+tmp/
