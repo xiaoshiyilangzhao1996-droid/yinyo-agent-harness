@@ -125,7 +125,7 @@
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["pending", "verified", "reverted", "partial"],
+          "enum": ["pending", "draft", "verified", "reverted", "partial"],
           "description": "Verification status"
         },
         "scheduled_at": {

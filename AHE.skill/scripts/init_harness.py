@@ -52,6 +52,26 @@ INITIAL_DIRS = [
     "manifests",
 ]
 
+# Profile-specific extras
+PROFILE_EXTRAS = {
+    "openclaw": {
+        "extra_dirs": [],
+        "extra_files": {},
+    },
+    "codex": {
+        "extra_dirs": [],
+        "extra_files": {},
+    },
+    "hermes": {
+        "extra_dirs": [],
+        "extra_files": {},
+    },
+    "generic": {
+        "extra_dirs": [],
+        "extra_files": {},
+    },
+}
+
 INITIAL_EXAMPLES = {
     "tool_descriptions/example.tool.yaml": """name: example_tool
 description: 一个示例工具，展示 HARNESS.md 工具描述格式
@@ -104,6 +124,22 @@ def init_workspace(path: str, profile: str = "generic"):
 
     # Create files
     for name, content in INITIAL_FILES.items():
+        if name == "AGENTS.md":
+            content = f"""# AGENTS.md
+
+> 遵循 HARNESS.md v1.0
+> Profile: {profile}
+
+## 组件概述
+- System Rules → AGENTS.md
+- Tool Descriptions → tool_descriptions/
+- Tool Implementations → tools/
+
+## 核心原则
+1. 所有修改必须附带 Change Manifest
+2. 每次修改都是可被证伪的假设
+3. 从最小化状态开始演化
+"""
         (root / name).write_text(content, encoding="utf-8")
 
     for rel_path, content in INITIAL_EXAMPLES.items():

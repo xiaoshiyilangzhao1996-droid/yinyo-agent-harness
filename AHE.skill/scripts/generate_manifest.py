@@ -180,6 +180,18 @@ def write_manifest(root: Path, changes: list, author: str):
     manifest["changes"] = changes
     manifest["verification"]["scheduled_at"] = scheduled
 
+    # Check for empty evidence fields → mark as draft
+    has_empty_evidence = any(
+        not c.get("failure_evidence", "").strip()
+        or not c.get("root_cause", "").strip()
+        or not c.get("targeted_fix", "").strip()
+        for c in changes
+    )
+    if has_empty_evidence:
+        manifest["verification"]["status"] = "draft"
+        print("[WARN] Some changes have empty evidence/root_cause/targeted_fix.")
+        print("       Manifest marked as 'draft'. Complete these fields before verification.")
+
     filename = f"change_{now.strftime('%Y%m%d_%H%M%S')}.json"
     out_path = root / "manifests" / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)

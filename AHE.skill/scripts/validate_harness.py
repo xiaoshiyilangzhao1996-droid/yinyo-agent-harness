@@ -13,9 +13,51 @@ import sys
 import json
 from pathlib import Path
 
+# Try to load profiles from YAML files
+PROFILES_DIR = Path(__file__).resolve().parent.parent / "profiles"
+PROFILES = {}  # Will be populated from YAML files, with hardcoded fallback
 
-# --- Profiles: 不同 Agent 框架的检查适配 ---
-PROFILES = {
+def _load_profiles():
+    profiles = {}
+    if PROFILES_DIR.is_dir():
+        for yaml_file in sorted(PROFILES_DIR.glob("*.yaml")):
+            try:
+                name = yaml_file.stem
+                lines = yaml_file.read_text(encoding="utf-8").splitlines()
+                checks = {}
+                current_check = None
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("check:"):
+                        continue
+                    if line.startswith("  ") and not line.startswith("    "):
+                        # Top-level check name
+                        current_check = line.strip().rstrip(":")
+                    elif current_check and ":" in line:
+                        key, val = line.split(":", 1)
+                        key = key.strip()
+                        val = val.strip()
+                        if current_check not in checks:
+                            checks[current_check] = {}
+                        if key in ("required",):
+                            checks[current_check][key] = val.lower() == "true"
+                        elif key in ("weight",):
+                            checks[current_check][key] = int(val)
+                        elif key in ("files", "extensions"):
+                            checks[current_check][key] = [v.strip().strip('"').strip("'") for v in val.strip("[]").split(",") if v.strip()]
+                        elif key == "dir":
+                            checks[current_check][key] = val.strip('"').strip("'")
+                        elif key == "indicator":
+                            checks[current_check][key] = val.strip('"').strip("'")
+                if checks:
+                    profiles[name] = checks
+            except Exception:
+                continue
+    return profiles
+
+# Load YAML profiles, fall back to hardcoded defaults
+_yaml_profiles = _load_profiles()
+HARDCODED_PROFILES = {
     "hermes": {
         "system_rules": {"files": ["AGENTS.md", "SOUL.md", "systemprompt.md"], "required": True, "weight": 2},
         "tool_descriptions": {"dir": "tool_descriptions", "extensions": [".yaml", ".yml", ".json"], "required": True, "weight": 2},
@@ -54,6 +96,13 @@ PROFILES = {
     },
 }
 
+# Merge: YAML profiles take priority, hardcoded fill gaps
+if _yaml_profiles:
+    PROFILES = dict(HARDCODED_PROFILES)
+    PROFILES.update(_yaml_profiles)
+else:
+    PROFILES = dict(HARDCODED_PROFILES)
+
 
 def audit_workspace(workspace_root: str, profile: str = "generic") -> dict:
     root = Path(workspace_root)
@@ -81,7 +130,7 @@ def audit_workspace(workspace_root: str, profile: str = "generic") -> dict:
 
     # Manifest 检查
     has_manifest_dir = (root / "manifests").is_dir()
-    has_manifest_paths = list(root.glob("*manifest*")) + list(root.glob("manifests/*.json"))
+    has_manifest_paths = [p for p in root.glob("*manifest*") if p.is_file()] + [p for p in root.glob("manifests/*.json") if p.is_file()]
     has_manifest = bool(has_manifest_paths)
 
     for name, check in checks.items():

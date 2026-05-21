@@ -27,7 +27,8 @@ def load_pending_manifests(root: Path) -> list:
     for f in sorted(manifests_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            if data.get("verification", {}).get("status") == "pending":
+            status = data.get("verification", {}).get("status")
+            if status == "pending" or status == "draft":
                 pending.append((f, data))
         except (json.JSONDecodeError, KeyError):
             continue
@@ -126,7 +127,8 @@ def verify_manifest(root: Path, manifest_path: str = None, results_path: str = N
         now = datetime.now(TZ).isoformat()
 
         # 更新 manifest
-        data["verification"]["status"] = result["verdict"]
+        status_map = {"keep": "verified", "revert": "reverted"}
+        data["verification"]["status"] = status_map.get(result["verdict"], "partial")
         data["verification"]["completed_at"] = now
         data["verification"]["result"] = {
             "expected_fixes_verified": result["expected_fixes_verified"],
