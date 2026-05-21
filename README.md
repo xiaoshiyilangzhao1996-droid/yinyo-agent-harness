@@ -1,6 +1,10 @@
 # 🦁 HARNESS.md + AHE.skill
 
-> **将复旦&北大的 Agentic Harness Engineering 论文，蒸馏成一份可落地的 Harness 规范和一个可运行的 Hermes Skill。**
+> **Status: v0.1 experimental**
+>
+> 将复旦&北大的 Agentic Harness Engineering 论文的核心思想，蒸馏成一份跨 Agent 的 Harness 规范和一个初版审计工具。
+>
+> ⚠️ 当前版本是 AHE 思想的规范化摘录 + 静态审计原型，不是完整的 AHE 自动演化框架。详见下方「当前能力边界」。
 
 ---
 
@@ -21,20 +25,21 @@
 **核心内容：**
 - 7 个正交组件的定义和职责
 - 标准目录结构
-- 组件注册格式
 - **Change Manifest 标准** — 每次修改带 falsifiable 预测，可验证、可归因、可回滚
 - 演化循环标准流程（Evaluate → Analyze → Improve → Verify）
 - 合规检查清单
 
-### 🔧 AHE.skill — Hermes 上的 Harness Evolution Skill
+### 🔧 AHE.skill — Hermes 上的 Harness 审计工具
 
 把 HARNESS.md 规范在 Hermes Agent 上落地为可执行的 Skill。
 
-**功能：**
-- **Harness Audit** — 检查当前 workspace 是否符合 HARNESS.md 规范
-- **Generate Manifest** — 修改组件时生成标准化的 Change Manifest
-- **Verify Changes** — 验证修改预测是否准确，自动判定 keep / revert
-- **Harness Init** — 从零创建符合规范的 workspace
+**当前已实现：**
+- ✅ **Harness Audit** — 检查 workspace 结构合规性（支持多 profile：hermes / openclaw / codex / generic）
+
+**规划中（未实现）：**
+- ⏳ Generate Manifest — 自动生成 Change Manifest（目前只有模板和 schema）
+- ⏳ Verify Changes — 验证修改预测（目前只有流程文档）
+- ⏳ Harness Init — 自动初始化 workspace（目前有 `init_harness.py` 脚本）
 
 ---
 
@@ -43,24 +48,38 @@
 ### 1. 阅读规范
 
 ```bash
-# 直接看
 cat HARNESS.md
-
-# 或者用 validate 脚本检查你的 workspace
-python AHE.skill/scripts/validate_harness.py /path/to/your/agent/workspace
 ```
 
-### 2. 安装 AHE.skill（如果使用 Hermes Agent）
+### 2. 审计你的 Agent workspace
 
 ```bash
-# 安装到 Hermes skills 目录
-cp -r AHE.skill /d/hermes/data/skills/ahe/
+# 通用审计
+python AHE.skill/scripts/validate_harness.py /path/to/workspace
 
-# 或者通过 skillhub
-skillhub install ahe
+# 指定 Agent 框架（更精确的规则判断）
+python AHE.skill/scripts/validate_harness.py /path/to/workspace --profile hermes
+python AHE.skill/scripts/validate_harness.py /path/to/workspace --profile openclaw
+python AHE.skill/scripts/validate_harness.py /path/to/workspace --profile codex
+
+# JSON 输出（便于程序消费）
+python AHE.skill/scripts/validate_harness.py /path/to/workspace --json
+
+# 正向示例：审计一个最小合规 workspace
+python AHE.skill/scripts/validate_harness.py examples/minimal-workspace
 ```
 
-### 3. 在你的 AGENTS.md 中声明遵循
+> ⚠️ **不要对本仓库自身运行 audit**。本仓库是规范 + 工具仓库，不是 Agent workspace。
+> 应**对目标 Agent workspace 运行**。
+> 正向示例请使用 `examples/minimal-workspace/`。
+
+### 3. 从零初始化新 workspace
+
+```bash
+python AHE.skill/scripts/init_harness.py my-agent-workspace [--profile hermes]
+```
+
+### 4. 在你的 AGENTS.md 中声明遵循
 
 ```markdown
 # AGENTS.md
@@ -68,9 +87,29 @@ skillhub install ahe
 > 🏷️ 遵循 HARNESS.md v1.0
 ```
 
-### 4. 开始管理你的 Change Manifest
+---
 
-每次修改核心组件时，创建 `manifests/change_<timestamp>.json`，按规范填写。
+## 当前能力边界
+
+### 已实现
+- ✅ **HARNESS.md 规范** — 组件拆分、目录标准、Change Manifest 格式、演化循环
+- ✅ **validate_harness.py** — 静态目录结构审计（支持 4 种 profile）
+- ✅ **Change Manifest JSON Schema** — 可校验 manifest 格式
+- ✅ **directory-template.md** — 目录结构模板
+- ✅ **examples/minimal-workspace/** — 正向示例
+- ✅ **profiles/** — Hermes / OpenClaw / Codex / generic 适配
+
+### 未实现（后续迭代）
+- ⏳ **Experience Observability** — trace 采集格式、评估运行数据结构、失败分析报告生成器
+- ⏳ **自动 Generate Manifest** — 根据 git diff / 用户输入自动生成
+- ⏳ **自动 Verify Manifest** — 读取评估结果，验证预测，回写 verdict
+- ⏳ **演化闭环** — Evaluate → Analyze → Improve → Verify 的可执行闭环
+- ⏳ **更多 profile** — Claude Code、Cursor 等框架的适配
+
+### 已知限制
+- validate_harness.py 只能做静态文件/目录检查，不能检查组件内容质量
+- 对 OpenClaw / Codex 等框架的 tool_descriptions 可能与其运行时注入机制不完全匹配
+- 部分 Agent 框架的工具描述不必然以文件形式存在于 workspace 中
 
 ---
 
@@ -78,15 +117,28 @@ skillhub install ahe
 
 ```
 ├── HARNESS.md                              # 规范文档（跨 Agent）
+├── README.md                               # 本文件
 ├── AHE.skill/
 │   ├── SKILL.md                            # Hermes Skill 定义
 │   ├── references/
 │   │   ├── HARNESS.md                      # 规范副本
 │   │   ├── change-manifest-schema.json     # Manifest JSON Schema
 │   │   └── directory-template.md           # 目录模板
-│   └── scripts/
-│       └── validate_harness.py             # 合规检查脚本
-└── README.md
+│   ├── scripts/
+│   │   ├── validate_harness.py             # 合规检查脚本
+│   │   ├── init_harness.py                 # 初始化脚本
+│   │   ├── generate_manifest.py            # Manifest 生成工具（开发中）
+│   │   └── verify_manifest.py              # Manifest 验证工具（开发中）
+│   └── profiles/
+│       ├── hermes.yaml                     # Hermes 框架适配
+│       ├── openclaw.yaml                   # OpenClaw 框架适配
+│       └── codex.yaml                      # Codex 框架适配
+├── examples/
+│   └── minimal-workspace/                  # 最小合规 workspace 示例
+└── analysis/                               # 经验可观测性标准文档
+    ├── README.md                           # 分析报告标准说明
+    ├── overview-template.md                # 概览报告模板
+    └── detail-template.md                  # 逐任务分析模板
 ```
 
 ---
